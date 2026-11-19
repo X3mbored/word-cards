@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Карточки слов</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#fff);--text:var(--tg-theme-text-color,#111);
+  --hint:var(--tg-theme-hint-color,#888);--card:var(--tg-theme-secondary-bg-color,#f2f2f5);
+  --accent:var(--tg-theme-button-color,#2f80ed);--accent-text:var(--tg-theme-button-text-color,#fff);
+  --ok:#1e9e5a;--ok-bg:rgba(30,158,90,.12);--bad:#d64545;--bad-bg:rgba(214,69,69,.12);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--hint);min-height:28px}
+.gear{border:none;background:none;color:var(--hint);font-size:20px;padding:0 0 0 8px}
+.bar{height:4px;background:var(--card);border-radius:2px;margin-top:8px}
+.bar>div{height:4px;width:0;background:var(--ok);border-radius:2px;transition:width .3s}
+.stack{position:relative;flex:1;margin:18px 0;perspective:1000px;min-height:260px}
+.card{position:absolute;inset:0;touch-action:none;user-select:none;cursor:grab}
+.card.under{transform:scale(.94) translateY(14px);pointer-events:none}
+.inner{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.inner.flip{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.back{transform:rotateY(180deg);background:linear-gradient(var(--bad-bg),var(--bad-bg)),var(--bg);color:var(--bad);cursor:pointer}
+.word{font-size:40px;font-weight:600;word-break:break-word}
+.ipa{font-size:16px;color:var(--hint);margin-top:8px}
+.ru{font-size:30px;font-weight:600;margin:8px 0 14px}
+.small{font-size:13px;margin-top:20px;opacity:.8}
+.tag{position:absolute;top:22px;font-size:15px;font-weight:700;padding:4px 10px;border-radius:8px;border:2px solid;opacity:0}
+.tag.ok{left:22px;color:var(--ok);border-color:var(--ok)}.tag.bad{right:22px;color:var(--bad);border-color:var(--bad)}
+.speak{position:absolute;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;border:none;background:var(--bg);color:var(--accent);font-size:20px}
+.btns{display:flex;gap:12px}
+.btn{flex:1;height:54px;border-radius:14px;font-size:17px;font-weight:600;border:2px solid;background:transparent;color:var(--text)}
+.btn.bad{color:var(--bad);border-color:var(--bad)}.btn.ok{color:var(--ok);border-color:var(--ok)}
+.btn.main{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+.btn.ghost{border-color:var(--card);background:var(--card)}
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;overflow:auto}
+.big{font-size:52px;font-weight:700}
+.h{font-size:22px;font-weight:600}
+.hint{color:var(--hint);font-size:14px}
+.chip{display:inline-block;font-size:14px;padding:4px 10px;margin:3px;border-radius:8px}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-top:6px}
+.grid.five{grid-template-columns:repeat(5,1fr)}
+.grid button{height:62px;border-radius:14px;border:2px solid transparent;background:var(--card);color:var(--text);font-size:20px;font-weight:700}
+.grid button.sel{border-color:var(--accent)}
+.grid small{display:block;font-size:11px;font-weight:400;color:var(--hint)}
+.panel{width:100%;background:var(--card);border-radius:16px;padding:14px;text-align:left}
+.prog{height:8px;background:var(--bg);border-radius:4px;margin:8px 0;position:relative}
+.prog>div{height:8px;border-radius:4px;background:var(--ok)}
+.prog>i{position:absolute;top:-3px;width:2px;height:14px;background:var(--text);opacity:.5}
+.row{display:flex;justify-content:space-between;font-size:14px;margin:3px 0}
+.hidden{visibility:hidden}
+.full{width:100%;flex:none;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><div class="hint">Загрузка…</div></div></div>
+<script>
+// Адрес твоего ngrok (см. README, шаг 3). Пусто = API на том же адресе, что и страница.
+const API = 'https://wannabe-stomp-steam.ngrok-free.dev';
+
+const tg = window.Telegram && Telegram.WebApp;
+const app = document.getElementById('app');
+const initData = tg ? tg.initData : '';
+if (tg) { tg.ready(); tg.expand(); }
+
+const LEVEL_NAMES = {A1: 'начальный', A2: 'элементарный', B1: 'средний', B2: 'выше среднего'};
+let me = null;
+let deck = [], i = 0, results = [], busy = false, mode = 'learn';
+
+async function api(path, body) {
+  const r = await fetch(API + path, {
+    method: body ? 'POST' : 'GET',
+    headers: {'X-Init-Data': initData, 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1'},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+const haptic = t => { try { tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const close = () => { try { tg.close(); } catch (e) {} };
+const fail = () => app.innerHTML = '<div class="center"><div>Не удалось связаться с ботом. Попробуйте позже.</div></div>';
+
+function speak(word) {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(word); u.lang = 'en-US'; u.rate = .9;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+async function start() {
+  if (!initData) {
+    app.innerHTML = '<div class="center"><div>Откройте карточки через кнопку бота в Telegram.</div></div>';
+    return;
+  }
+  try {
+    me = await api('/api/me');
+    if (!me.level) return welcome();
+    await learn();
+  } catch (e) { fail(); }
+}
+
+// ---------- первый вход: тест или выбор вручную
+function welcome() {
+  app.innerHTML = `<div class="center"><div class="h">Определим твой уровень</div>
+    <div class="hint">40 слов разных уровней вперемешку. Отвечай честно: «знаю», только если помнишь перевод.
+    Уровень считается по первому уровню, где ты знаешь меньше 70% слов.</div>
+    <button class="btn main full" id="t">Пройти тест</button>
+    <button class="btn ghost full" id="m">Выбрать уровень самому</button></div>`;
+  document.getElementById('t').onclick = startTest;
+  document.getElementById('m').onclick = () => settings(true);
+}
+
+async function startTest() {
+  try { deck = (await api('/api/test')).cards; } catch (e) { return fail(); }
+  mode = 'test'; i = 0; results = []; renderShell('Тест уровня', 'Не знаю', 'Знаю'); render();
+}
+
+async function finishTest() {
+  let r; try { r = await api('/api/test', {answers: results.map(x => [x.id, x.ok])}); } catch (e) { return fail(); }
+  me.level = r.level;
+  const rows = Object.entries(r.detail).map(([lv, p]) =>
+    `<div class="row"><span>${lv}</span><span style="color:${p >= 70 ? 'var(--ok)' : 'var(--bad)'}">${p}%</span></div>`).join('');
+  app.innerHTML = `<div class="center"><div class="hint">Твой уровень</div><div class="big">${r.level}</div>
+    <div class="hint">${LEVEL_NAMES[r.level]}</div><div class="panel">${rows}</div>
+    <div class="h" style="font-size:18px;margin-top:10px">Сколько новых слов в день?</div>
+    <div class="hint">Повторение забытых слов добавляется сверху. Поменять можно в любой момент.</div>
+    <div class="grid five">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
+    </div>`;
+  app.querySelectorAll('[data-n]').forEach(b => b.onclick = async () => {
+    await api('/api/settings', {per_day: +b.dataset.n}); start();
+  });
+}
+
+// ---------- настройки
+function settings(firstTime) {
+  const lv = me.level;
+  app.innerHTML = `<div class="center"><div class="h">${firstTime ? 'Выбери уровень' : 'Настройки'}</div>
+    <div class="grid">${me.levels.map(k => `<button data-l="${k}" class="${k === lv ? 'sel' : ''}">${k}<small>${LEVEL_NAMES[k]}</small></button>`).join('')}</div>
+    <div class="h" style="font-size:18px;margin-top:12px">Новых слов в день</div>
+    <div class="grid five">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
+    <button class="btn main full" id="save">Готово</button>
+    ${firstTime ? '' : '<button class="btn ghost full" id="retest">Пройти тест уровня заново</button>'}</div>`;
+  let level = lv, per = me.per_day;
+  app.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
+    level = b.dataset.l; app.querySelectorAll('[data-l]').forEach(x => x.classList.toggle('sel', x === b));
+  });
+  app.querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
+    per = +b.dataset.n; app.querySelectorAll('[data-n]').forEach(x => x.classList.toggle('sel', x === b));
+  });
+  document.getElementById('save').onclick = async () => {
+    if (!level) return;
+    await api('/api/settings', {level, per_day: per}); start();
+  };
+  const rt = document.getElementById('retest'); if (rt) rt.onclick = startTest;
+}
+
+// ---------- обучение
+async function learn() {
+  const d = await api('/api/deck');
+  mode = 'learn'; deck = d.cards; i = 0; results = [];
+  if (!deck.length) return summary(true);
+  renderShell(`Уровень ${me.level}`, '✕ Не помню', '✓ Помню'); render();
+}
+
+function progressPanel(p) {
+  if (!p) return '';
+  return `<div class="panel"><div class="row"><b>Уровень ${p.level}</b><span>${p.mastered} из ${p.total} слов</span></div>
+    <div class="prog"><div style="width:${Math.min(100, p.pct)}%"></div><i style="left:${p.need}%"></i></div>
+    <div class="hint">${p.can_level_up ? `Ты запомнил ${p.pct}% слов уровня. Можно переходить на ${p.next}!`
+      : `Запомнено ${p.pct}%. Для перехода на следующий уровень нужно ${p.need}%.`}</div></div>`;
+}
+
+async function summary(empty) {
+  try { me = await api('/api/me'); } catch (e) {}
+  const p = me.progress;
+  const k = results.filter(r => r.ok).length;
+  const head = empty
+    ? '<div class="big">✓</div><div class="h">На сегодня всё</div><div class="hint">Новые слова и повторение будут завтра.</div>'
+    : `<div class="big">${k} / ${results.length}</div><div class="hint">слов помнишь</div><div>` +
+      results.map(r => `<span class="chip ${r.ok ? 'ok' : 'bad'}">${esc(r.word)}</span>`).join('') + '</div>' +
+      `<div class="hint">${k < results.length ? 'Забытые слова вернутся завтра.' : 'Отлично!'}</div>`;
+  app.innerHTML = `<div class="center">${head}${progressPanel(p)}
+    ${p && p.can_level_up ? `<button class="btn ok full" id="up">Перейти на ${p.next}</button>` : ''}
+    <button class="btn main full" id="done">Готово</button>
+    <button class="btn ghost full" id="set">Настройки</button></div>`;
+  document.getElementById('done').onclick = close;
+  document.getElementById('set').onclick = () => settings(false);
+  const up = document.getElementById('up');
+  if (up) up.onclick = async () => { await api('/api/settings', {level: p.next}); start(); };
+  if (!empty) haptic('heavy');
+}
+
+// ---------- карточки (общие для теста и обучения)
+function renderShell(label, noText, yesText) {
+  app.innerHTML = `<div class="top"><span>${label}</span><span><span id="cnt"></span>` +
+    (mode === 'learn' ? '<button class="gear" id="gear" aria-label="Настройки">⚙</button>' : '') + '</span></div>' +
+    '<div class="bar"><div id="bar"></div></div><div class="stack" id="stack"></div>' +
+    `<div class="btns" id="btns"><button class="btn bad" id="no">${noText}</button><button class="btn ok" id="yes">${yesText}</button></div>`;
+  document.getElementById('no').onclick = forgot;
+  document.getElementById('yes').onclick = know;
+  const g = document.getElementById('gear'); if (g) g.onclick = () => settings(false);
+}
+
+function mk(c, under) {
+  const d = document.createElement('div');
+  d.className = 'card' + (under ? ' under' : '');
+  const okTag = mode === 'test' ? 'ЗНАЮ' : 'ПОМНЮ', badTag = mode === 'test' ? 'НЕ ЗНАЮ' : 'НЕ ПОМНЮ';
+  d.innerHTML = `<div class="inner"><div class="face"><span class="tag ok">${okTag}</span><span class="tag bad">${badTag}</span>
+    <div class="word">${esc(c.word)}</div>${c.ipa ? `<div class="ipa">[${esc(c.ipa)}]</div>` : ''}
+    <button class="speak" aria-label="Произнести">🔊</button></div>
+    <div class="face back"><div style="font-size:18px">${esc(c.word)}</div><div class="ru">${esc(c.ru || '')}</div>
+    ${c.example ? `<div style="font-size:16px;font-style:italic">${esc(c.example)}</div>` : ''}
+    <div class="small">Нажми или смахни влево, чтобы продолжить</div></div></div>`;
+  const sp = d.querySelector('.speak');
+  sp.onpointerdown = e => e.stopPropagation();
+  sp.onclick = e => { e.stopPropagation(); speak(c.word); };
+  return d;
+}
+
+function render() {
+  const stack = document.getElementById('stack');
+  document.getElementById('bar').style.width = Math.round(i / deck.length * 100) + '%';
+  stack.innerHTML = '';
+  if (i >= deck.length) return mode === 'test' ? finishTest() : summary(false);
+  document.getElementById('cnt').textContent = (i + 1) + ' / ' + deck.length;
+  if (i + 1 < deck.length) stack.appendChild(mk(deck[i + 1], true));
+  const c = mk(deck[i], false); stack.appendChild(c); drag(c);
+}
+
+function answer(ok) {
+  results.push({id: deck[i].id, word: deck[i].word, ok});
+  if (mode === 'learn') api('/api/answer', {word_id: deck[i].id, ok}).catch(() => {});
+}
+
+function fly(c, dir) {
+  busy = true;
+  c.style.transition = 'transform .3s';
+  c.style.transform = `translateX(${dir * 520}px) rotate(${dir * 25}deg)`;
+  setTimeout(() => { i++; busy = false; render(); }, 280);
+}
+
+const topCard = () => document.getElementById('stack').lastChild;
+
+function know() {
+  const c = topCard(); if (busy || !c || c.dataset.f) return;
+  haptic('light'); answer(true); fly(c, 1);
+}
+
+function forgot() {
+  const c = topCard(); if (busy || !c) return;
+  if (c.dataset.f) return closeBack(c);
+  haptic('medium'); answer(false);
+  if (mode === 'test') return fly(c, -1);
+  c.dataset.f = 1;
+  c.style.transition = 'transform .2s'; c.style.transform = 'none';
+  c.querySelectorAll('.tag').forEach(t => t.style.opacity = 0);
+  c.querySelector('.inner').classList.add('flip');
+  document.getElementById('btns').classList.add('hidden');
+}
+
+function closeBack(c) {
+  document.getElementById('btns').classList.remove('hidden');
+  fly(c, -1);
+}
+
+function drag(c) {
+  let x0 = null, dx = 0;
+  c.onpointerdown = e => { if (busy) return; x0 = e.clientX; dx = 0; c.setPointerCapture(e.pointerId); c.style.transition = 'none'; };
+  c.onpointermove = e => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    if (c.dataset.f && dx > 0) dx = 0;
+    c.style.transform = `translateX(${dx}px) rotate(${dx / 15}deg)`;
+    if (!c.dataset.f) {
+      const t = c.querySelectorAll('.tag');
+      t[0].style.opacity = Math.max(0, Math.min(1, dx / 80));
+      t[1].style.opacity = Math.max(0, Math.min(1, -dx / 80));
+    }
+  };
+  const up = () => {
+    if (x0 === null) return; x0 = null;
+    if (c.dataset.f && Math.abs(dx) <= 5) { dx = 0; return closeBack(c); }  // касание по переводу
+    if (Math.abs(dx) > 90) {
+      if (c.dataset.f) closeBack(c); else if (dx > 0) know(); else forgot();
+    } else if (Math.abs(dx) > 5) {
+      c.style.transition = 'transform .25s'; c.style.transform = 'none';
+      c.querySelectorAll('.tag').forEach(t => t.style.opacity = 0);
+    }
+    dx = 0;
+  };
+  c.onpointerup = up; c.onpointercancel = up;
+}
+
+start();
+</script>
+</body>
+</html>
