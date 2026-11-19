@@ -3,63 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="light">
 <title>Карточки слов</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..900&display=swap" rel="stylesheet">
 <style>
+/* Стиль курса (значения из «Пульт фразы»): светлый бежевый фон, контент на белых карточках, плитки-метки.
+   Метки: ✓ #22C55E — «Помню / Знаю»; ✕ #EF4444 — «Не помню / Не знаю» и обратная сторона карточки; ? #FACC15 — тест уровня.
+   Цвета аспектов (#3B82F6, #A855F7, #F97316, #C05240) здесь не используются. Тема Telegram не применяется. */
 :root{
-  --bg:var(--tg-theme-bg-color,#fff);--text:var(--tg-theme-text-color,#111);
-  --hint:var(--tg-theme-hint-color,#888);--card:var(--tg-theme-secondary-bg-color,#f2f2f5);
-  --accent:var(--tg-theme-button-color,#2f80ed);--accent-text:var(--tg-theme-button-text-color,#fff);
-  --ok:#1e9e5a;--ok-bg:rgba(30,158,90,.12);--bad:#d64545;--bad-bg:rgba(214,69,69,.12);
+  --bg:#E8E2D7; --ink:#1C1B19; --sec:#5F5A52; --faint:#8E8676; --well:#EFEAE2; --dark:#1F1D1A; --cream:#F3EBDD;
+  --ok:#22C55E; --no:#EF4444; --q:#FACC15;
+  --font:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --lift:0 22px 44px -18px rgba(80,58,28,.30), 0 4px 12px rgba(80,58,28,.07);
+  --tile-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 10px 18px -10px rgba(60,40,20,.40), 0 2px 6px rgba(60,40,20,.10);
+  --gloss:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,0) 55%);
+  color-scheme:light;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+html{background:var(--bg)}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:radial-gradient(120% 70% at 50% 18%, #EFEAE1 0%, var(--bg) 60%) no-repeat var(--bg);color:var(--ink);font-family:var(--font);font-optical-sizing:auto;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:3px solid var(--dark);outline-offset:3px}
 #app{display:flex;flex-direction:column;height:100%;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
-.top{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--hint);min-height:28px}
-.gear{border:none;background:none;color:var(--hint);font-size:20px;padding:0 0 0 8px}
-.bar{height:4px;background:var(--card);border-radius:2px;margin-top:8px}
-.bar>div{height:4px;width:0;background:var(--ok);border-radius:2px;transition:width .3s}
+
+/* плитки-метки: цветной скруглённый квадрат + контурная иконка */
+.tl{--s:44px;width:var(--s);height:var(--s);border-radius:calc(var(--s)*.26);display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none;box-shadow:var(--tile-shadow)}
+.tl::after{content:'';position:absolute;inset:0;border-radius:inherit;background:var(--gloss);pointer-events:none}
+.tl svg{display:block}
+.tl.ok{background:var(--ok)}.tl.no{background:var(--no)}.tl.q{background:var(--q)}
+.tl.lv{background:var(--dark);color:var(--cream);font-weight:850;font-size:calc(var(--s)*.38);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* круглые кнопки и звук */
+.rv{flex:none;width:46px;height:46px;border-radius:50%;border:0;padding:0;background:var(--well);display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.rv svg{width:26px;height:26px;display:block}
+.snd{position:fixed;top:calc(16px + env(safe-area-inset-top));right:16px;z-index:5}
+
+/* экран с карточками */
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:46px;padding-right:56px}
+.lbl{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:var(--sec)}
+.right{display:flex;align-items:center;gap:10px}
+.meta{font-size:14px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
+.bar{height:10px;border-radius:5px;background:#DDD5C8;margin-top:12px;overflow:hidden}
+.bar>div{height:100%;width:0;border-radius:5px;background:var(--dark);transition:width .3s}
+.bar.q>div{background:var(--q)}
 .stack{position:relative;flex:1;margin:18px 0;perspective:1000px;min-height:260px}
-.card{position:absolute;inset:0;touch-action:none;user-select:none;cursor:grab}
+.card{position:absolute;inset:0;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
 .card.under{transform:scale(.94) translateY(14px);pointer-events:none}
-.inner{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.inner{position:relative;width:100%;height:100%;transition:transform .38s ease-out;transform-style:preserve-3d}
 .inner.flip{transform:rotateY(180deg)}
-.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
-.back{transform:rotateY(180deg);background:linear-gradient(var(--bad-bg),var(--bad-bg)),var(--bg);color:var(--bad);cursor:pointer}
-.word{font-size:40px;font-weight:600;word-break:break-word}
-.ipa{font-size:16px;color:var(--hint);margin-top:8px}
-.ru{font-size:30px;font-weight:600;margin:8px 0 14px}
-.small{font-size:13px;margin-top:20px;opacity:.8}
-.tag{position:absolute;top:22px;font-size:15px;font-weight:700;padding:4px 10px;border-radius:8px;border:2px solid;opacity:0}
-.tag.ok{left:22px;color:var(--ok);border-color:var(--ok)}.tag.bad{right:22px;color:var(--bad);border-color:var(--bad)}
-.speak{position:absolute;bottom:18px;right:18px;width:44px;height:44px;border-radius:50%;border:none;background:var(--bg);color:var(--accent);font-size:20px}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;overflow:hidden}
+.front{background:linear-gradient(180deg,#FFFFFF 0%,#F7F4EF 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),var(--lift)}
+.back{transform:rotateY(180deg);background:var(--no);color:#FFFFFF;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),var(--lift)}
+.back::after{content:'';position:absolute;inset:0;border-radius:inherit;background:var(--gloss);pointer-events:none}
+.fc{width:100%}
+.word{font-size:46px;font-weight:850;letter-spacing:-.025em;line-height:1.12;overflow-wrap:normal;word-break:normal;hyphens:none}
+.ipa{font-size:18px;font-weight:500;color:var(--sec);margin-top:12px}
+.bw{font-size:18px;font-weight:700;opacity:.9}
+.ru{font-size:34px;font-weight:850;letter-spacing:-.02em;line-height:1.15;margin:10px 0 14px;overflow-wrap:normal;word-break:normal;hyphens:none}
+.ex{font-size:18px;font-weight:500;font-style:italic;line-height:1.35}
+.small{font-size:13px;font-weight:600;margin-top:22px;opacity:.85}
+.tag{position:absolute;top:18px;opacity:0;pointer-events:none;z-index:2}
+.tag.ok{left:18px}.tag.bad{right:18px}
 .btns{display:flex;gap:12px}
-.btn{flex:1;height:54px;border-radius:14px;font-size:17px;font-weight:600;border:2px solid;background:transparent;color:var(--text)}
-.btn.bad{color:var(--bad);border-color:var(--bad)}.btn.ok{color:var(--ok);border-color:var(--ok)}
-.btn.main{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
-.btn.ghost{border-color:var(--card);background:var(--card)}
-.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;overflow:auto}
-.big{font-size:52px;font-weight:700}
-.h{font-size:22px;font-weight:600}
-.hint{color:var(--hint);font-size:14px}
-.chip{display:inline-block;font-size:14px;padding:4px 10px;margin:3px;border-radius:8px}
-.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-top:6px}
-.grid.five{grid-template-columns:repeat(5,1fr)}
-.grid button{height:62px;border-radius:14px;border:2px solid transparent;background:var(--card);color:var(--text);font-size:20px;font-weight:700}
-.grid button.sel{border-color:var(--accent)}
-.grid small{display:block;font-size:11px;font-weight:400;color:var(--hint)}
-.panel{width:100%;background:var(--card);border-radius:16px;padding:14px;text-align:left}
-.prog{height:8px;background:var(--bg);border-radius:4px;margin:8px 0;position:relative}
-.prog>div{height:8px;border-radius:4px;background:var(--ok)}
-.prog>i{position:absolute;top:-3px;width:2px;height:14px;background:var(--text);opacity:.5}
-.row{display:flex;justify-content:space-between;font-size:14px;margin:3px 0}
+.act{flex:1;height:64px;border:0;padding:0;border-radius:18px;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:var(--tile-shadow);transition:transform .15s}
+.act::after{content:'';position:absolute;inset:0;border-radius:inherit;background:var(--gloss);pointer-events:none}
+.act.no{background:var(--no)}.act.ok{background:var(--ok)}
+.act svg{display:block}
+.act:active{transform:scale(.96)}
 .hidden{visibility:hidden}
-.full{width:100%;flex:none;margin-top:8px}
+
+/* остальные экраны */
+.center{flex:1;display:flex;flex-direction:column;overflow:auto;padding-top:46px}
+.col{margin:auto 0;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.h{margin:4px 0 0;font-size:26px;font-weight:900;letter-spacing:-.02em;line-height:1.15;text-wrap:balance}
+.lead{margin:0;color:var(--sec);font-size:16px;font-weight:500;line-height:1.45;text-wrap:pretty}
+.hint{color:var(--sec);font-size:14px;font-weight:500;line-height:1.4}
+.sect{margin-top:8px;font-size:15px;font-weight:700;color:var(--sec)}
+.big{font-size:52px;font-weight:900;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.msg{font-size:16px;font-weight:600;color:var(--sec);line-height:1.45}
+.btn{border:0;border-radius:16px;padding:14px 22px;font-size:16px;font-weight:700;background:var(--dark);color:var(--cream);box-shadow:0 10px 20px -10px rgba(40,30,15,.6);display:flex;align-items:center;justify-content:center;gap:10px}
+.btn.ghost{background:rgba(255,255,255,.55);color:var(--ink);box-shadow:inset 0 0 0 2px rgba(31,29,26,.10)}
+.btn.full{width:100%;flex:none;min-height:54px}
+.surface{width:100%;background:linear-gradient(180deg,#FFFFFF 0%,#F7F4EF 100%);border-radius:26px;box-shadow:inset 0 1px 0 rgba(255,255,255,.95),var(--lift);padding:16px 18px;text-align:left}
+.rows{display:flex;flex-direction:column;gap:12px}
+.lvrow{display:flex;align-items:center;gap:12px}
+.track,.prog{position:relative;height:10px;border-radius:5px;background:#DDD5C8}
+.track{flex:1}
+.track>div,.prog>div{height:100%;border-radius:5px;background:var(--ok)}
+.track.no>div{background:var(--no)}
+.track>i,.prog>i{position:absolute;top:-4px;width:2px;height:18px;margin-left:-1px;border-radius:1px;background:var(--ink);opacity:.45}
+.pct{width:46px;text-align:right;font-size:15px;font-weight:750;font-variant-numeric:tabular-nums}
+.ph{display:flex;align-items:center;gap:12px;font-size:16px;font-weight:800}
+.prog{margin:14px 0 10px}
+.seg{display:flex;width:100%;background:var(--well);border-radius:18px;padding:5px}
+.seg button{flex:1;border:0;background:none;height:54px;border-radius:13px;font-size:clamp(17px,2vw,22px);font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;transition:color .15s,background-color .15s}
+.seg button.sel{background:var(--dark);color:var(--cream);box-shadow:0 8px 16px -8px rgba(40,30,15,.55)}
+.levels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;background:var(--well);border-radius:24px;padding:10px}
+.levels button{border:0;background:none;padding:6px 2px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.levels .tl{transition:opacity .2s}
+.levels button:not(.sel) .tl{opacity:.42}
+.levels small{font-size:12px;font-weight:600;line-height:1.2;color:var(--faint)}
+.levels button.sel small{color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;background:#FFFFFF;border-radius:13px;padding:5px 12px 5px 5px;font-size:15px;font-weight:650;box-shadow:inset 0 0 0 2px #E4DDD2}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<div id="app"><div class="center"><div class="hint">Загрузка…</div></div></div>
+<button class="rv snd" id="snd" aria-pressed="true" aria-label="Выключить звук"></button>
+<div id="app"><div class="center"><div class="col"><div class="hint">Загрузка…</div></div></div></div>
 <script>
 // Адрес твоего ngrok (см. README, шаг 3). Пусто = API на том же адресе, что и страница.
 const API = 'https://wannabe-stomp-steam.ngrok-free.dev';
@@ -68,6 +124,8 @@ const tg = window.Telegram && Telegram.WebApp;
 const app = document.getElementById('app');
 const initData = tg ? tg.initData : '';
 if (tg) { tg.ready(); tg.expand(); }
+// всегда светлый бежевый стиль курса: шапку и фон Telegram красим в цвет страницы, тему Telegram не берём
+if (tg) { try { tg.setHeaderColor('#E8E2D7'); tg.setBackgroundColor('#E8E2D7'); if (tg.setBottomBarColor) tg.setBottomBarColor('#E8E2D7'); } catch (e) {} }
 
 const LEVEL_NAMES = {A1: 'начальный', A2: 'элементарный', B1: 'средний', B2: 'выше среднего'};
 let me = null;
@@ -85,17 +143,87 @@ async function api(path, body) {
 const haptic = t => { try { tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const close = () => { try { tg.close(); } catch (e) {} };
-const fail = () => app.innerHTML = '<div class="center"><div>Не удалось связаться с ботом. Попробуйте позже.</div></div>';
+const fail = () => app.innerHTML = '<div class="center"><div class="col"><div class="msg">Не удалось связаться с ботом. Попробуйте позже.</div></div></div>';
 
-function speak(word) {
-  if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(word); u.lang = 'en-US'; u.rate = .9;
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
+// ---------- плитки-метки и иконки (как в уроках: цветной скруглённый квадрат + контурная иконка)
+const SYM = {
+  ok: '<path d="M29 52 L44 66 L72 36" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  no: '<path d="M33 33 L67 67 M67 33 L33 67" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  q: '<path d="M37.5 38 a12.5 12.5 0 1 1 18.6 10.9 c-4.2 2.4 -6.1 4.6 -6.1 9.1" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="50" cy="71.5" r="4.34" fill="#FFFFFF"/>',
+};
+const svg = (body, px) => `<svg viewBox="0 0 100 100" width="${px}" height="${px}" aria-hidden="true">${body}</svg>`;
+const tile = (k, px) => `<span class="tl ${k}" style="--s:${px}px">${svg(SYM[k], px * .92)}</span>`;
+const lvTile = (lv, px) => `<span class="tl lv" style="--s:${px}px">${lv}</span>`;
+const doneTile = px => `<span class="tl lv" style="--s:${px}px">${svg(SYM.ok.replace('#FFFFFF', '#F3EBDD'), px * .92)}</span>`;
+const LINE = 'stroke="#1C1B19" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"';
+const SPEAKER = `<path d="M20 40 H32 L50 26 V74 L32 60 H20 Z" ${LINE} fill="none"/>`;
+const ICON = {
+  sliders: svg(`<path d="M20 28 H80 M20 50 H80 M20 72 H80" ${LINE} fill="none"/><circle cx="38" cy="28" r="8" ${LINE} fill="#EFEAE2"/><circle cx="64" cy="50" r="8" ${LINE} fill="#EFEAE2"/><circle cx="44" cy="72" r="8" ${LINE} fill="#EFEAE2"/>`, 26),
+  soundOn: svg(`${SPEAKER}<path d="M62 39 Q69 50 62 61 M71 30 Q84 50 71 70" ${LINE} fill="none"/>`, 26),
+  soundOff: svg(`${SPEAKER}<path d="M62 41 L80 59 M80 41 L62 59" ${LINE} fill="none"/>`, 26),
+};
+
+// ---------- звуки (как в уроках: короткие синтезированные щелчки, включаются с первого касания)
+let AC = null, soundOn = true;
+try { soundOn = localStorage.getItem('wc-sound') !== 'off'; } catch (e) {}
+function ac() { if (!soundOn) return null; try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
+function tone(f, d, { type = 'sine', g = .18, at = 0, f2 = null } = {}) {
+  const a = ac(); if (!a) return; const t = a.currentTime + at, o = a.createOscillator(), v = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(g, t + .004); v.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(v).connect(a.destination); o.start(t); o.stop(t + d + .02);
 }
+function hiss(d, { g = .08, at = 0, lo = 1500 } = {}) {
+  const a = ac(); if (!a) return; const t = a.currentTime + at, n = Math.ceil(a.sampleRate * d), b = a.createBuffer(1, n, a.sampleRate), x = b.getChannelData(0);
+  for (let k = 0; k < n; k++) x[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / n, 3);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), v = a.createGain(); s.buffer = b; f.type = 'highpass'; f.frequency.value = lo; v.gain.value = g;
+  s.connect(f).connect(v).connect(a.destination); s.start(t);
+}
+// «печать» метки — тот же звук, что у плиток ✓ / ✕ / ? в уроках
+const stamp = k => { tone([784, 440, 659][k], .35, { type: 'triangle', g: .16 }); tone(110, .14, { g: .25, f2: 60 }); hiss(.04, { g: .12, lo: 1200 }); };
+const SFX = {
+  know: () => stamp(0),      // свайп вправо: «Помню»
+  forgot: () => stamp(1),    // свайп влево / переворот: «Не помню»
+  test: () => stamp(2),      // ответ в тесте уровня
+  end: () => [659, 784, 1047].forEach((f, k) => tone(f, .32 + k * .08, { type: 'triangle', g: .12, at: k * .12 })),  // конец сессии
+  click: () => { hiss(.03, { g: .12, lo: 2500 }); tone(2200, .04, { g: .06 }); },
+};
+const sfx = name => { try { SFX[name](); } catch (e) {} };
+const snd = document.getElementById('snd');
+function paintSound() {
+  snd.innerHTML = soundOn ? ICON.soundOn : ICON.soundOff;
+  snd.setAttribute('aria-pressed', soundOn);
+  snd.setAttribute('aria-label', soundOn ? 'Выключить звук' : 'Включить звук');
+}
+snd.onclick = () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem('wc-sound', soundOn ? 'on' : 'off'); } catch (e) {}
+  paintSound(); if (soundOn) sfx('click');
+};
+paintSound();
+
+// ---------- текст всегда помещается в карточку: длинные слова и переводы уменьшаются, а не вылезают за край
+function fitFace(face, items) {
+  const fc = face && face.querySelector('.fc'); if (!fc) return;
+  const cs = getComputedStyle(face), room = face.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  for (let k = 1; ; k -= .03) {
+    items.forEach(([el, max, min]) => { if (el) el.style.fontSize = Math.max(min, Math.round(max * k)) + 'px'; });
+    const wide = items.some(([el]) => el && el.scrollWidth > el.clientWidth + 1);
+    if ((!wide && fc.offsetHeight <= room) || items.every(([el, max, min]) => !el || max * k <= min)) break;
+  }
+}
+function fitCard(card) {
+  const q = s => card.querySelector(s);
+  fitFace(q('.front'), [[q('.word'), 46, 16], [q('.ipa'), 18, 12]]);
+  fitFace(q('.back'), [[q('.bw'), 18, 12], [q('.ru'), 34, 15], [q('.ex'), 18, 12], [q('.small'), 13, 11]]);
+}
+const refit = () => document.querySelectorAll('#stack .card').forEach(fitCard);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+addEventListener('resize', refit);
 
 async function start() {
   if (!initData) {
-    app.innerHTML = '<div class="center"><div>Откройте карточки через кнопку бота в Telegram.</div></div>';
+    app.innerHTML = '<div class="center"><div class="col"><div class="msg">Откройте карточки через кнопку бота в Telegram.</div></div></div>';
     return;
   }
   try {
@@ -107,11 +235,11 @@ async function start() {
 
 // ---------- первый вход: тест или выбор вручную
 function welcome() {
-  app.innerHTML = `<div class="center"><div class="h">Определим твой уровень</div>
-    <div class="hint">40 слов разных уровней вперемешку. Отвечай честно: «знаю», только если помнишь перевод.
-    Уровень считается по первому уровню, где ты знаешь меньше 70% слов.</div>
-    <button class="btn main full" id="t">Пройти тест</button>
-    <button class="btn ghost full" id="m">Выбрать уровень самому</button></div>`;
+  app.innerHTML = `<div class="center"><div class="col">${tile('q', 96)}<div class="h">Определим твой уровень</div>
+    <p class="lead">40 слов разных уровней вперемешку. Отвечай честно: «знаю», только если помнишь перевод.
+    Уровень считается по первому уровню, где ты знаешь меньше 70% слов.</p>
+    <button class="btn full" id="t">Пройти тест</button>
+    <button class="btn ghost full" id="m">Выбрать уровень самому</button></div></div>`;
   document.getElementById('t').onclick = startTest;
   document.getElementById('m').onclick = () => settings(true);
 }
@@ -125,27 +253,28 @@ async function finishTest() {
   let r; try { r = await api('/api/test', {answers: results.map(x => [x.id, x.ok])}); } catch (e) { return fail(); }
   me.level = r.level;
   const rows = Object.entries(r.detail).map(([lv, p]) =>
-    `<div class="row"><span>${lv}</span><span style="color:${p >= 70 ? 'var(--ok)' : 'var(--bad)'}">${p}%</span></div>`).join('');
-  app.innerHTML = `<div class="center"><div class="hint">Твой уровень</div><div class="big">${r.level}</div>
-    <div class="hint">${LEVEL_NAMES[r.level]}</div><div class="panel">${rows}</div>
-    <div class="h" style="font-size:18px;margin-top:10px">Сколько новых слов в день?</div>
+    `<div class="lvrow">${lvTile(lv, 36)}<div class="track ${p >= 70 ? 'ok' : 'no'}"><div style="width:${p}%"></div><i style="left:70%"></i></div><span class="pct">${p}%</span>${tile(p >= 70 ? 'ok' : 'no', 28)}</div>`).join('');
+  app.innerHTML = `<div class="center"><div class="col"><div class="hint">Твой уровень</div>${lvTile(r.level, 88)}
+    <div class="hint">${LEVEL_NAMES[r.level]}</div><div class="surface rows">${rows}</div>
+    <div class="sect">Сколько новых слов в день?</div>
     <div class="hint">Повторение забытых слов добавляется сверху. Поменять можно в любой момент.</div>
-    <div class="grid five">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
-    </div>`;
+    <div class="seg">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
+    </div></div>`;
   app.querySelectorAll('[data-n]').forEach(b => b.onclick = async () => {
     await api('/api/settings', {per_day: +b.dataset.n}); start();
   });
+  sfx('end');
 }
 
 // ---------- настройки
 function settings(firstTime) {
   const lv = me.level;
-  app.innerHTML = `<div class="center"><div class="h">${firstTime ? 'Выбери уровень' : 'Настройки'}</div>
-    <div class="grid">${me.levels.map(k => `<button data-l="${k}" class="${k === lv ? 'sel' : ''}">${k}<small>${LEVEL_NAMES[k]}</small></button>`).join('')}</div>
-    <div class="h" style="font-size:18px;margin-top:12px">Новых слов в день</div>
-    <div class="grid five">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
-    <button class="btn main full" id="save">Готово</button>
-    ${firstTime ? '' : '<button class="btn ghost full" id="retest">Пройти тест уровня заново</button>'}</div>`;
+  app.innerHTML = `<div class="center"><div class="col"><div class="h">${firstTime ? 'Выбери уровень' : 'Настройки'}</div>
+    <div class="levels">${me.levels.map(k => `<button data-l="${k}" class="${k === lv ? 'sel' : ''}">${lvTile(k, 52)}<small>${LEVEL_NAMES[k]}</small></button>`).join('')}</div>
+    <div class="sect">Новых слов в день</div>
+    <div class="seg">${me.per_day_options.map(n => `<button data-n="${n}" class="${n === me.per_day ? 'sel' : ''}">${n}</button>`).join('')}</div>
+    <button class="btn full" id="save">Готово</button>
+    ${firstTime ? '' : `<button class="btn ghost full" id="retest">${tile('q', 26)}Пройти тест уровня заново</button>`}</div></div>`;
   let level = lv, per = me.per_day;
   app.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
     level = b.dataset.l; app.querySelectorAll('[data-l]').forEach(x => x.classList.toggle('sel', x === b));
@@ -170,7 +299,7 @@ async function learn() {
 
 function progressPanel(p) {
   if (!p) return '';
-  return `<div class="panel"><div class="row"><b>Уровень ${p.level}</b><span>${p.mastered} из ${p.total} слов</span></div>
+  return `<div class="surface"><div class="ph">${lvTile(p.level, 36)}<span>${p.mastered} из ${p.total} слов</span></div>
     <div class="prog"><div style="width:${Math.min(100, p.pct)}%"></div><i style="left:${p.need}%"></i></div>
     <div class="hint">${p.can_level_up ? `Ты запомнил ${p.pct}% слов уровня. Можно переходить на ${p.next}!`
       : `Запомнено ${p.pct}%. Для перехода на следующий уровень нужно ${p.need}%.`}</div></div>`;
@@ -181,27 +310,30 @@ async function summary(empty) {
   const p = me.progress;
   const k = results.filter(r => r.ok).length;
   const head = empty
-    ? '<div class="big">✓</div><div class="h">На сегодня всё</div><div class="hint">Новые слова и повторение будут завтра.</div>'
-    : `<div class="big">${k} / ${results.length}</div><div class="hint">слов помнишь</div><div>` +
-      results.map(r => `<span class="chip ${r.ok ? 'ok' : 'bad'}">${esc(r.word)}</span>`).join('') + '</div>' +
+    ? `${doneTile(88)}<div class="h">На сегодня всё</div><div class="hint">Новые слова и повторение будут завтра.</div>`
+    : `<div class="big">${k} / ${results.length}</div><div class="hint">слов помнишь</div><div class="chips">` +
+      results.map(r => `<span class="chip">${tile(r.ok ? 'ok' : 'no', 22)}${esc(r.word)}</span>`).join('') + '</div>' +
       `<div class="hint">${k < results.length ? 'Забытые слова вернутся завтра.' : 'Отлично!'}</div>`;
-  app.innerHTML = `<div class="center">${head}${progressPanel(p)}
-    ${p && p.can_level_up ? `<button class="btn ok full" id="up">Перейти на ${p.next}</button>` : ''}
-    <button class="btn main full" id="done">Готово</button>
-    <button class="btn ghost full" id="set">Настройки</button></div>`;
+  app.innerHTML = `<div class="center"><div class="col">${head}${progressPanel(p)}
+    ${p && p.can_level_up ? `<button class="btn ghost full" id="up">${lvTile(p.next, 26)}Перейти на ${p.next}</button>` : ''}
+    <button class="btn full" id="done">Готово</button>
+    <button class="btn ghost full" id="set">Настройки</button></div></div>`;
   document.getElementById('done').onclick = close;
   document.getElementById('set').onclick = () => settings(false);
   const up = document.getElementById('up');
   if (up) up.onclick = async () => { await api('/api/settings', {level: p.next}); start(); };
-  if (!empty) haptic('heavy');
+  if (!empty) { haptic('heavy'); sfx('end'); }
 }
 
 // ---------- карточки (общие для теста и обучения)
 function renderShell(label, noText, yesText) {
-  app.innerHTML = `<div class="top"><span>${label}</span><span><span id="cnt"></span>` +
-    (mode === 'learn' ? '<button class="gear" id="gear" aria-label="Настройки">⚙</button>' : '') + '</span></div>' +
-    '<div class="bar"><div id="bar"></div></div><div class="stack" id="stack"></div>' +
-    `<div class="btns" id="btns"><button class="btn bad" id="no">${noText}</button><button class="btn ok" id="yes">${yesText}</button></div>`;
+  const mark = mode === 'test' ? `${tile('q', 36)}<span>${label}</span>` : lvTile(me.level, 36);
+  const name = s => s.replace(/[✓✕]/g, '').trim();
+  app.innerHTML = `<div class="top"><span class="lbl">${mark}</span><span class="right"><span class="meta" id="cnt"></span>` +
+    (mode === 'learn' ? `<button class="rv" id="gear" aria-label="Настройки">${ICON.sliders}</button>` : '') + '</span></div>' +
+    `<div class="bar${mode === 'test' ? ' q' : ''}"><div id="bar"></div></div><div class="stack" id="stack"></div>` +
+    `<div class="btns" id="btns"><button class="act no" id="no" aria-label="${name(noText)}">${svg(SYM.no, 46)}</button>` +
+    `<button class="act ok" id="yes" aria-label="${name(yesText)}">${svg(SYM.ok, 46)}</button></div>`;
   document.getElementById('no').onclick = forgot;
   document.getElementById('yes').onclick = know;
   const g = document.getElementById('gear'); if (g) g.onclick = () => settings(false);
@@ -210,16 +342,11 @@ function renderShell(label, noText, yesText) {
 function mk(c, under) {
   const d = document.createElement('div');
   d.className = 'card' + (under ? ' under' : '');
-  const okTag = mode === 'test' ? 'ЗНАЮ' : 'ПОМНЮ', badTag = mode === 'test' ? 'НЕ ЗНАЮ' : 'НЕ ПОМНЮ';
-  d.innerHTML = `<div class="inner"><div class="face"><span class="tag ok">${okTag}</span><span class="tag bad">${badTag}</span>
-    <div class="word">${esc(c.word)}</div>${c.ipa ? `<div class="ipa">[${esc(c.ipa)}]</div>` : ''}
-    <button class="speak" aria-label="Произнести">🔊</button></div>
-    <div class="face back"><div style="font-size:18px">${esc(c.word)}</div><div class="ru">${esc(c.ru || '')}</div>
-    ${c.example ? `<div style="font-size:16px;font-style:italic">${esc(c.example)}</div>` : ''}
-    <div class="small">Нажми или смахни влево, чтобы продолжить</div></div></div>`;
-  const sp = d.querySelector('.speak');
-  sp.onpointerdown = e => e.stopPropagation();
-  sp.onclick = e => { e.stopPropagation(); speak(c.word); };
+  d.innerHTML = `<div class="inner"><div class="face front"><span class="tag ok">${tile('ok', 46)}</span><span class="tag bad">${tile('no', 46)}</span>
+    <div class="fc"><div class="word">${esc(c.word)}</div>${c.ipa ? `<div class="ipa">[${esc(c.ipa)}]</div>` : ''}</div></div>
+    <div class="face back"><div class="fc"><div class="bw">${esc(c.word)}</div><div class="ru">${esc(c.ru || '')}</div>
+    ${c.example ? `<div class="ex">${esc(c.example)}</div>` : ''}
+    <div class="small">Нажми или смахни влево, чтобы продолжить</div></div></div></div>`;
   return d;
 }
 
@@ -231,6 +358,7 @@ function render() {
   document.getElementById('cnt').textContent = (i + 1) + ' / ' + deck.length;
   if (i + 1 < deck.length) stack.appendChild(mk(deck[i + 1], true));
   const c = mk(deck[i], false); stack.appendChild(c); drag(c);
+  stack.querySelectorAll('.card').forEach(fitCard);
 }
 
 function answer(ok) {
@@ -240,7 +368,7 @@ function answer(ok) {
 
 function fly(c, dir) {
   busy = true;
-  c.style.transition = 'transform .3s';
+  c.style.transition = 'transform .3s cubic-bezier(.5,0,.9,.5)';
   c.style.transform = `translateX(${dir * 520}px) rotate(${dir * 25}deg)`;
   setTimeout(() => { i++; busy = false; render(); }, 280);
 }
@@ -249,13 +377,13 @@ const topCard = () => document.getElementById('stack').lastChild;
 
 function know() {
   const c = topCard(); if (busy || !c || c.dataset.f) return;
-  haptic('light'); answer(true); fly(c, 1);
+  haptic('light'); sfx(mode === 'test' ? 'test' : 'know'); answer(true); fly(c, 1);
 }
 
 function forgot() {
   const c = topCard(); if (busy || !c) return;
   if (c.dataset.f) return closeBack(c);
-  haptic('medium'); answer(false);
+  haptic('medium'); sfx(mode === 'test' ? 'test' : 'forgot'); answer(false);
   if (mode === 'test') return fly(c, -1);
   c.dataset.f = 1;
   c.style.transition = 'transform .2s'; c.style.transform = 'none';
